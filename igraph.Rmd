@@ -1,0 +1,256 @@
+---
+title: "Graph Theory"
+author: "Navankur Verma"
+date: "10/06/2020"
+output:
+  html_document:
+    fig_caption: yes
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      smooth_scroll: FALSE
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 8)
+
+```
+
+# Graphs using `igraph`
+
+Graph using formula notation:
+```{r, message=FALSE}
+library(igraph)
+
+g <- graph.formula(1-2, 1-3, 2-3, 2-4, 3-5, 4-5, 4-6, 4-7, 5-6, 6-7)
+plot(g)
+```
+
+In this case we are explicitly specifying the edges of g, which are all undirected.
+
+```{r}
+g2 <- graph.formula(1-+2, 1-+3, 2++3, 1-+4)
+g3 <- graph.formula(Sam-+Mary, Sam-+Tom, Mary++Tom)
+plot(g2)
+plot(g3)
+```
+
+Graph using Edge list:
+
+```{r}
+el <- matrix(c(1,2, 1,3, 1,4, 2,3, 3,4), byrow = T, ncol = 2)
+g4 <- graph_from_edgelist(el)
+plot(g4)
+```
+
+Graph using Adjacency Matrix:
+
+```{r}
+adj <- matrix(round(runif(n = 9)), nrow = 3)
+diag(adj) <- 0 #main condition for 'no-self' loop, diag elements are zero.
+
+g5 <- graph_from_adjacency_matrix(adj)
+plot(g5)
+```
+
+
+# Printing and MetaData
+
+```{r}
+library(sand) #various graphs in 'igraph' format
+data(lazega)
+lazega <- upgrade_graph(lazega)# needed due to recent updates of igraph package
+
+V(lazega) #Vertices
+
+E(lazega) #Edges
+
+lazega #Summary print
+```
+
+In the first line, UN means undirected, 36 is the number of nodes and 115 the number of edges.
+
+Additional metadata attached to the graph are called attributes and can be discovered with `list.???.attributes(lazega)`, where `???` can be one of graph, vertex, edge. We can print out the available details of graphs and even update them:
+```{r}
+list.vertex.attributes(lazega)
+
+get.vertex.attribute(lazega, name = "Gender")
+
+lazega = set.graph.attribute(lazega, "name", "Lazega Lawyers")
+list.graph.attributes(lazega)
+lazega
+```
+
+Its Adjacency matrix:
+```{r}
+adj <- get.adjacency(lazega)
+str(adj)
+```
+
+Easy to work with:
+```{r}
+adj <- as.matrix(adj)
+head(adj)
+
+image(adj)
+```
+
+# Plotting
+
+Layouts:
+```{r}
+layout <- layout.fruchterman.reingold(lazega) # most commonly used layout, also used by default
+layout_circle <- layout_in_circle(lazega) # sometimes used
+
+plot(lazega, layout = layout)
+plot(lazega, layout = layout_circle)
+```
+
+
+Aesthetics:
+```{r}
+# igraph.options(
+#   vertex.color = V(lazega)$Office,
+#   vertex.label = NA,
+#   vertex.size = 1.5 * degree(lazega),
+#   edge.width = 2,
+#   edge.color = "grey50",
+#   edge.curved = 0.5
+# )
+
+#or set options directly in the plot command:
+plot(
+  lazega,
+  vertex.color = V(lazega)$Office,
+  vertex.label = NA,
+  vertex.size = 1.12 * degree(lazega),
+  edge.width = 2,
+  edge.color = "grey50",
+  edge.curved = 0
+)
+
+shapes <- c("circle","square")
+
+#Office location indicated by color, type of practice indicated by vertex shape, vertex size proportional to years with firm
+
+plot(
+  lazega,
+  vertex.color = V(lazega)$Office,
+  vertex.shape = shapes[V(lazega)$Practice],
+  vertex.size = 0.5* V(lazega)$Years
+)
+
+# 3 most central nodes based on different centrality measures:
+
+plot(
+  lazega,
+  vertex.color = (centr_betw(lazega)$res >= sort(centr_betw(lazega)$res, decreasing = T)[3]) ,
+  main = "Betweenness Centrality\nBased on number of shortest paths which a nodes lies on"
+)
+
+plot(
+  lazega,
+  vertex.color = (centr_clo(lazega)$res >= sort(centr_clo(lazega)$res, decreasing = T)[3]) ,
+  main = "Closeness Centrality\nBased on Avg Geodesic Distant (Shortest Path)"
+)
+
+plot(
+  lazega,
+  vertex.color = (centr_eigen(lazega)$vector >= sort(centr_eigen(lazega)$vector, decreasing = T)[3]) ,
+  main = "Eigen Centrality\nBased on important nodes a node connects with"
+)
+
+plot(
+  lazega,
+  vertex.color = (page_rank(lazega)$vector >= sort(page_rank(lazega)$vector, decreasing = T)[3]) ,
+  main = "Page Rank\nKatz Centrality with extension of Penalization for higher degree"
+)
+
+plot(
+  lazega,
+  vertex.color = coreness(lazega)+1,
+  main = "k-Cores\nNodes which are connected to at least k others nodes"
+)
+legend("topright", legend = c("0-Core","1-Core","2-Core","3-Core","4-Core","5-Core"), fill = categorical_pal(6))
+
+# plot(
+#   lazega,
+#   vertex.color = adjustcolor(coreness(lazega)+1, 0.5),
+#   main = "k-Cores", sub = "Nodes which are connected to at least k others nodes"
+# )
+# legend("topright", legend = c("0-Core","1-Core","2-Core","3-Core","4-Core","5-Core"), fill =adjustcolor(unique(coreness(lazega)+1), 0.5))
+
+#removing nodes with based on null degrees:
+reduced_lazega <- delete.vertices(lazega, which(degree(lazega) == 0))
+plot(reduced_lazega)
+```
+
+# Network Summaries
+
+```{r}
+data(ppi.CC) #Protien Interactions graph
+ppi.CC <- upgrade_graph(ppi.CC)
+```
+
+Global clustering coefficient is:
+```{r}
+transitivity(ppi.CC)
+```
+
+The degrees and the degree distribution:
+
+```{r}
+d.yeast <- degree(ppi.CC)
+
+hist(d.yeast,col="blue",
+     xlab = "Degree", ylab = "Frequency",
+     main = "Degree Distribution")
+
+barplot(table(d.yeast), xlab = "Degree", ylab = "Frequency",
+        main = "Degree Distribution", col = "SkyBlue")
+
+```
+
+On log-log scales:
+
+```{r}
+dd.yeast <- degree.distribution(ppi.CC)
+d <- 0:max(d.yeast)
+ind <- (dd.yeast != 0)
+
+plot(d[ind], dd.yeast[ind], log = "xy", col = "blue",
+     xlab = c("Log-Degree"), ylab = c("Log-Proportion"),
+     main = "Log-Log Degree Distribution")
+```
+
+Degree of the neighbours of a node:
+
+```{r}
+a.nn.deg.yeast <- graph.knn(ppi.CC,V(ppi.CC))$knn
+plot(d.yeast, a.nn.deg.yeast, log="xy",
+     col = "goldenrod", xlab = c("Log Vertex Degree"),
+     ylab = c("Log Average Neighbour Degree"))
+```
+
+Vertex (node) centrality:
+```{r}
+ppi_cent_1 <- centr_eigen(ppi.CC)$vector # eigenvector centrality
+ppi_cent_2 <- page_rank(ppi.CC)$vector # Page-Rank centrality
+ppi_cent_3 <- centr_clo(ppi.CC)$res # closeness centrality
+ppi_cent_4 <- centr_betw(ppi.CC)$res # betweenness centrality
+chosen_centrality <- ppi_cent_1 # change as needed
+V(ppi.CC)[order(chosen_centrality, decreasing = T)[1:5]]
+```
+
+Edge Centrality:
+```{r}
+ppi_cent_5 <- edge.betweenness(ppi.CC)
+E(ppi.CC)[order(ppi_cent_5, decreasing=T)[1:3]]
+```
+
+```{r}
+cores <- coreness(ppi.CC) #nodes which are connected to at least k other 
+```
